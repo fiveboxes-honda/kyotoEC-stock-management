@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>在庫管理システム</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --blue:#0D9DDB;        /* 主要アクセント:青に近い水色 */
+  --blue-dark:#0A7FB2;
+  --blue-pale:#EAF7FD;   /* 見出し行などの淡水色 */
+  --line:#BFE4F5;        /* 罫線 */
+  --ink:#22303A;         /* 本文文字色 */
+  --sub:#5C707D;
+  --amber-bg:#FFF4DC; --amber:#9A5B00;
+  --red-bg:#FDE9E7;  --red:#C0392B;
+  --shadow:0 2px 10px rgba(13,157,219,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:"UD デジタル 教科書体 NP","UD Digi Kyokasho NP-R","UD Digi Kyokasho N-R","Klee One","BIZ UDPGothic",sans-serif;
+  background:#FFFFFF;color:var(--ink);font-size:15.5px;line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:15px;color:var(--ink)}
+
+/* ---- ヘッダー ---- */
+.app-header{
+  border-bottom:3px solid var(--blue);
+  background:#fff;position:sticky;top:0;z-index:20;
+}
+.app-header .inner{max-width:1100px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;gap:12px}
+.app-title{font-size:20px;font-weight:600;letter-spacing:.06em;color:var(--blue-dark)}
+.app-title small{font-size:12px;color:var(--sub);margin-left:10px;letter-spacing:.02em}
+.storage-note{margin-left:auto;font-size:12px;color:var(--sub)}
+
+main{max-width:1100px;margin:0 auto;padding:26px 22px 80px}
+
+/* ---- 共通部品 ---- */
+.crumb{font-size:13.5px;margin-bottom:14px}
+.crumb a{color:var(--blue-dark);text-decoration:none;border-bottom:1px solid var(--line)}
+.crumb a:hover{border-bottom-color:var(--blue-dark)}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:20px;flex-wrap:wrap}
+.page-head h1{font-size:23px;font-weight:600;letter-spacing:.04em}
+.page-head h1 .sub-actions{font-size:12.5px;font-weight:400;margin-left:12px}
+.page-head h1 .sub-actions button{background:none;border:none;color:var(--sub);text-decoration:underline;font-size:12.5px;padding:2px}
+.page-head h1 .sub-actions button:hover{color:var(--blue-dark)}
+.head-actions{display:flex;gap:10px;flex-wrap:wrap}
+
+.btn{
+  border:1.5px solid var(--blue);border-radius:8px;background:#fff;color:var(--blue-dark);
+  padding:9px 18px;font-size:14.5px;font-weight:600;letter-spacing:.03em;transition:background .15s;
+}
+.btn:hover{background:var(--blue-pale)}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:var(--blue-dark);border-color:var(--blue-dark)}
+.btn-sm{padding:4px 12px;font-size:12.5px;border-radius:6px}
+.btn-danger{border-color:var(--red);color:var(--red)}
+.btn-danger:hover{background:var(--red-bg)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* ---- 合計バンド ---- */
+.band{
+  display:flex;gap:0;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;
+  margin-bottom:26px;box-shadow:var(--shadow);flex-wrap:wrap;
+}
+.band .cell{flex:1;min-width:200px;padding:18px 24px;background:#fff}
+.band .cell + .cell{border-left:1.5px solid var(--line)}
+.band .label{font-size:13px;color:var(--blue-dark);font-weight:600;letter-spacing:.08em;margin-bottom:2px}
+.band .value{font-size:30px;font-weight:600;letter-spacing:.02em}
+.band .value .unit{font-size:15px;color:var(--sub);margin-left:4px;font-weight:400}
+
+/* ---- 事業者カード ---- */
+.section-title{font-size:16px;font-weight:600;color:var(--blue-dark);letter-spacing:.06em;
+  padding-bottom:6px;border-bottom:2px solid var(--line);margin:6px 0 16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:22px}
+.card{
+  border:1.5px solid var(--line);border-left:6px solid var(--blue);border-radius:10px;
+  padding:16px 18px;background:#fff;cursor:pointer;transition:box-shadow .15s, transform .15s;
+}
+.card:hover{box-shadow:var(--shadow);transform:translateY(-1px)}
+.card .biz-name{font-size:17px;font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.card .biz-name .arrow{color:var(--blue);font-size:14px}
+.card .biz-stats{display:flex;gap:18px;font-size:13.5px;color:var(--sub)}
+.card .biz-stats b{font-size:17px;color:var(--ink);font-weight:600;margin-left:4px}
+.add-biz{display:flex;gap:8px;max-width:420px}
+.add-biz input{flex:1;border:1.5px solid var(--line);border-radius:8px;padding:8px 12px}
+.add-biz input:focus{outline:none;border-color:var(--blue)}
+
+/* ---- テーブル ---- */
+.table-wrap{border:1.5px solid var(--line);border-radius:10px;overflow:auto;background:#fff}
+table.inv{width:100%;border-collapse:collapse;min-width:840px}
+table.inv th{
+  background:var(--blue-pale);color:var(--blue-dark);font-size:13px;font-weight:600;
+  letter-spacing:.05em;text-align:left;padding:10px 12px;border-bottom:2px solid var(--line);white-space:nowrap;
+}
+table.inv td{padding:10px 12px;border-bottom:1px solid var(--line);font-size:14.5px;vertical-align:top}
+table.inv tr:last-child td{border-bottom:none}
+table.inv td.num, table.inv th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.inv .jan{font-variant-numeric:tabular-nums;letter-spacing:.02em;white-space:nowrap}
+table.inv .note-cell{color:var(--sub);font-size:13px;max-width:220px}
+.badge{display:inline-block;font-size:11.5px;font-weight:600;border-radius:5px;padding:1px 8px;margin-left:6px;white-space:nowrap}
+.badge.warn{background:var(--amber-bg);color:var(--amber)}
+.badge.danger{background:var(--red-bg);color:var(--red)}
+.badge.muted{background:#F0F3F5;color:var(--sub)}
+.badge.blue{background:var(--blue-pale);color:var(--blue-dark)}
+.lots-toggle{background:none;border:none;color:var(--blue-dark);font-size:12.5px;text-decoration:underline;padding:0;margin-top:2px}
+.lots-detail{background:#FAFDFF}
+.lots-detail td{padding:8px 12px 12px}
+.lots-detail table{border-collapse:collapse;font-size:13px}
+.lots-detail th{font-weight:600;color:var(--sub);text-align:left;padding:2px 18px 2px 0;font-size:12px}
+.lots-detail td.l{padding:2px 18px 2px 0;border:none;font-size:13px}
+.row-actions{white-space:nowrap}
+.row-actions button{background:none;border:none;font-size:13px;padding:2px 6px;text-decoration:underline}
+.row-actions .edit{color:var(--blue-dark)}
+.row-actions .del{color:var(--red)}
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.search-box{border:1.5px solid var(--line);border-radius:8px;padding:8px 14px;width:300px;max-width:100%}
+.search-box:focus{outline:none;border-color:var(--blue)}
+.empty{
+  border:1.5px dashed var(--line);border-radius:10px;padding:40px 20px;text-align:center;color:var(--sub);font-size:14.5px;
+}
+.empty .btn{margin-top:14px}
+
+/* ---- フォーム ---- */
+.form-card{border:1.5px solid var(--line);border-radius:12px;padding:26px 28px;max-width:680px;background:#fff;box-shadow:var(--shadow)}
+.field{margin-bottom:18px}
+.field label{display:block;font-size:13.5px;font-weight:600;color:var(--blue-dark);margin-bottom:5px;letter-spacing:.04em}
+.field label .opt{font-weight:400;color:var(--sub);font-size:12px;margin-left:6px}
+.field input,.field select,.field textarea{
+  width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 12px;background:#fff;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue)}
+.field .hint{font-size:12px;color:var(--sub);margin-top:3px}
+.field-row{display:flex;gap:14px}
+.field-row .field{flex:1}
+.calc-total{font-size:14px;color:var(--sub)}
+.calc-total b{font-size:19px;color:var(--ink);margin-left:6px}
+.lots-editor{border:1.5px solid var(--line);border-radius:8px;padding:12px 14px;background:#FAFDFF}
+.lot-row{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.lot-row input[type=date]{width:180px}
+.lot-row input[type=number]{width:120px}
+.lot-row .rm{background:none;border:none;color:var(--red);font-size:13px;text-decoration:underline}
+.form-error{
+  background:var(--red-bg);color:var(--red);border-radius:8px;padding:10px 14px;font-size:14px;
+  margin-bottom:16px;display:none;
+}
+.form-error.show{display:block}
+.form-error button{margin-top:6px}
+.form-actions{display:flex;gap:10px;margin-top:24px}
+
+/* ---- 発注書取込 ---- */
+.stepper{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+.step{font-size:13px;padding:5px 14px;border-radius:20px;border:1.5px solid var(--line);color:var(--sub);background:#fff}
+.step.on{border-color:var(--blue);color:#fff;background:var(--blue);font-weight:600}
+.step.done{border-color:var(--blue);color:var(--blue-dark);background:var(--blue-pale)}
+.drop{
+  border:2px dashed var(--line);border-radius:12px;padding:48px 20px;text-align:center;color:var(--sub);
+  transition:background .15s,border-color .15s;background:#fff;
+}
+.drop.over{border-color:var(--blue);background:var(--blue-pale)}
+.drop .btn{margin-top:14px}
+.import-summary{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0}
+.import-summary .pill{border:1.5px solid var(--line);border-radius:10px;padding:10px 16px;font-size:13.5px;background:#fff}
+.import-summary .pill b{font-size:19px;margin-left:6px}
+.import-note{background:var(--blue-pale);border-radius:8px;padding:12px 16px;font-size:13.5px;color:var(--blue-dark);margin:14px 0}
+.strike{text-decoration:line-through;color:var(--sub)}
+.after-val{color:var(--blue-dark);font-weight:600}
+.import-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.done-box{border:1.5px solid var(--line);border-radius:12px;padding:30px;text-align:center;background:#fff;box-shadow:var(--shadow)}
+.done-box .big{font-size:19px;font-weight:600;color:var(--blue-dark);margin-bottom:8px}
+
+/* ---- モーダル ---- */
+.modal-back{position:fixed;inset:0;background:rgba(34,48,58,.35);display:none;z-index:50;align-items:center;justify-content:center;padding:20px}
+.modal-back.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:24px 26px;max-width:460px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.18)}
+.modal h3{font-size:17px;color:var(--blue-dark);margin-bottom:10px;font-weight:600}
+.modal .body{font-size:14.5px;margin-bottom:18px}
+.modal .body input{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:9px 12px;margin-top:8px}
+.modal .body input:focus{outline:none;border-color:var(--blue)}
+.modal .m-actions{display:flex;gap:10px;justify-content:flex-end}
+
+/* ---- PDF描画用(非表示) ---- */
+#pdf-work{position:fixed;left:-3000px;top:0}
+.pdf-page{
+  width:794px;height:1123px;background:#fff;color:#000;padding:48px 52px;position:relative;
+  font-family:"UD デジタル 教科書体 NP","UD Digi Kyokasho NP-R","Klee One","BIZ UDPGothic",sans-serif;
+  font-size:13px;line-height:1.5;
+}
+.pdf-page .order-no{font-size:11px;margin-bottom:4px}
+.pdf-page .pdf-title{text-align:center;font-size:24px;letter-spacing:.5em;margin:2px 0 18px;font-weight:600}
+.pdf-page .pdf-head{display:flex;justify-content:space-between;margin-bottom:16px}
+.pdf-page .client{font-size:16px}
+.pdf-page .client .client-name{font-size:18px;font-weight:600;border-bottom:1.5px solid #000;display:inline-block;padding:0 24px 2px 2px;margin-bottom:8px}
+.pdf-page .client p{margin-bottom:4px;font-size:13px}
+.pdf-page .company{text-align:left;font-size:12px;line-height:1.7;max-width:250px}
+.pdf-page table.od{width:100%;border-collapse:collapse;font-size:12px}
+.pdf-page table.od th{border:1px solid #000;background:#EFEFEF;padding:5px 7px;font-weight:600;white-space:nowrap}
+.pdf-page table.od td{border:1px solid #000;padding:4.5px 7px}
+.pdf-page table.od td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pdf-page .totals{margin-top:0;margin-left:auto;width:280px;border-collapse:collapse;font-size:12.5px}
+.pdf-page .totals td{border:1px solid #000;padding:5.5px 9px}
+.pdf-page .totals td.lbl{background:#EFEFEF;width:110px;font-weight:600}
+.pdf-page .totals td.num{text-align:right}
+.pdf-page .page-no{position:absolute;bottom:26px;left:52px;font-size:10.5px}
+
+@media (max-width:640px){
+  .band .value{font-size:24px}
+  .page-head h1{font-size:19px}
+}
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="inner">
+    <div class="app-title">在庫管理システム<small>EC inventory</small></div>
+    <div class="storage-note" id="storage-note"></div>
+  </div>
+</header>
+<main id="app"></main>
+
+<div class="modal-back" id="modal-back">
+  <div class="modal">
+    <h3 id="modal-title"></h3>
+    <div class="body" id="modal-body"></div>
+    <div class="m-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<div id="pdf-work"></div>
+<script>
+/* =========================================================
+   状態管理
+========================================================= */
+const KEY = 'ec_zaiko_v1';
+let state = { businesses: [], items: [] };
+// item: {id, businessId, jan, name, price, note, lots:[{expiry:'YYYY-MM-DD'|null, qty}]}
+let route = { view: 'top' };
+let importState = null;
+let bulkState = null;
+let hasStorage = false;
+
+let storageMode = 'none';   // 'claude' | 'local' | 'none'
+async function loadState(){
+  if (window.storage) {
+    storageMode = 'claude'; hasStorage = true;
+    try {
+      const r = await window.storage.get(KEY);
+      if (r && r.value) state = JSON.parse(r.value);
+    } catch(e) { /* 初回はキーなし */ }
+  } else if (window.localStorage) {
+    storageMode = 'local'; hasStorage = true;
+    try {
+      const v = localStorage.getItem(KEY);
+      if (v) state = JSON.parse(v);
+    } catch(e) { console.error(e); }
+  }
+  const note = document.getElementById('storage-note');
+  note.textContent = hasStorage
+    ? 'データはこのブラウザに自動保存されます'
+    : '※保存機能が無効の環境です(このセッション内のみ有効)';
+}
+async function saveState(){
+  try {
+    if (storageMode === 'claude') await window.storage.set(KEY, JSON.stringify(state));
+    else if (storageMode === 'local') localStorage.setItem(KEY, JSON.stringify(state));
+  } catch(e){ console.error('保存に失敗しました', e); }
+}
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const fmt = n => Number(n||0).toLocaleString('ja-JP');
+const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const qtyOf = it => it.lots.reduce((a,l)=>a + (Number(l.qty)||0), 0);
+const totalOf = it => qtyOf(it) * (Number(it.price)||0);
+const bizOf = id => state.businesses.find(b=>b.id===id);
+const itemsOf = bizId => state.items.filter(i=>i.businessId===bizId);
+
+function expiryInfo(dstr){
+  if (!dstr) return { cls:'muted', label:'期限なし' };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const d = new Date(dstr + 'T00:00:00');
+  const days = Math.round((d - today) / 86400000);
+  if (days < 0)   return { cls:'danger', label:'期限切れ' };
+  if (days <= 30) return { cls:'warn',   label:'残' + days + '日' };
+  return null;
+}
+function nearestExpiry(it){
+  const ds = it.lots.filter(l=>l.expiry).map(l=>l.expiry).sort();
+  return ds[0] || null;
+}
+function sortedLotsFIFO(lots){
+  return [...lots].sort((a,b)=>{
+    if (!a.expiry && !b.expiry) return 0;
+    if (!a.expiry) return 1;            // 期限なしは最後に消費
+    if (!b.expiry) return -1;
+    return a.expiry < b.expiry ? -1 : 1;
+  });
+}
+
+/* =========================================================
+   ルーティング / 描画
+========================================================= */
+function go(r){ route = r; render(); window.scrollTo(0,0); }
+function render(){
+  const app = document.getElementById('app');
+  if (route.view === 'top')      app.innerHTML = viewTop();
+  else if (route.view === 'biz')  app.innerHTML = viewBiz(route.bizId);
+  else if (route.view === 'form') app.innerHTML = viewForm(route);
+  else if (route.view === 'import') app.innerHTML = viewImport(route.bizId);
+  else if (route.view === 'bulk') app.innerHTML = viewBulk(route.bizId);
+  bindEvents();
+}
+
+/* ---------- TOPページ ---------- */
+function viewTop(){
+  const totalQty = state.items.reduce((a,i)=>a+qtyOf(i),0);
+  const totalAmt = state.items.reduce((a,i)=>a+totalOf(i),0);
+  const cards = state.businesses.map(b=>{
+    const its = itemsOf(b.id);
+    const q = its.reduce((a,i)=>a+qtyOf(i),0);
+    const t = its.reduce((a,i)=>a+totalOf(i),0);
+    return `<div class="card" data-goto-biz="${b.id}">
+      <div class="biz-name">${esc(b.name)}<span class="arrow">▶</span></div>
+      <div class="biz-stats">
+        <span>在庫総数<b>${fmt(q)}</b> 点</span>
+        <span>総額<b>¥${fmt(t)}</b></span>
+      </div>
+    </div>`;
+  }).join('');
+  return `
+  <div class="page-head">
+    <h1>在庫サマリー</h1>
+    <div class="head-actions">
+      <button class="btn" data-goto-bulk>Excelで一括登録</button>
+      <button class="btn btn-primary" data-goto-form>＋ 新規在庫登録</button>
+    </div>
+  </div>
+  <div class="band">
+    <div class="cell"><div class="label">全体の在庫総数</div><div class="value">${fmt(totalQty)}<span class="unit">点</span></div></div>
+    <div class="cell"><div class="label">全体の在庫総額</div><div class="value">¥${fmt(totalAmt)}</div></div>
+  </div>
+  <div class="section-title">事業者ごとの在庫</div>
+  ${state.businesses.length ? `<div class="cards">${cards}</div>` : `<div class="empty">まだ事業者が登録されていません。<br>下の入力欄から最初の事業者を追加してください。</div><div style="height:16px"></div>`}
+  <div class="add-biz">
+    <input type="text" id="new-biz-name" placeholder="事業者名を入力(例:今西製菓)">
+    <button class="btn" id="add-biz-btn">＋ 事業者を追加</button>
+  </div>`;
+}
+
+/* ---------- 事業者ページ ---------- */
+function viewBiz(bizId){
+  const b = bizOf(bizId);
+  if (!b) return viewTop();
+  const its = itemsOf(bizId);
+  const q = its.reduce((a,i)=>a+qtyOf(i),0);
+  const t = its.reduce((a,i)=>a+totalOf(i),0);
+  const kw = (route.kw||'').trim();
+  const shown = kw ? its.filter(i => i.jan.includes(kw) || i.name.includes(kw)) : its;
+
+  const rows = shown.map(it=>{
+    const iq = qtyOf(it);
+    const near = nearestExpiry(it);
+    const info = near ? expiryInfo(near) : (it.lots.some(l=>l.qty>0) ? {cls:'muted',label:'期限なし'} : null);
+    const multiLot = it.lots.length > 1;
+    const lotRows = sortedLotsFIFO(it.lots).map(l=>{
+      const li = expiryInfo(l.expiry);
+      return `<tr><td class="l">${l.expiry ? esc(l.expiry) : '期限なし'}${li && l.expiry ? `<span class="badge ${li.cls}">${li.label}</span>`:''}</td><td class="l" style="text-align:right">${fmt(l.qty)} 点</td></tr>`;
+    }).join('');
+    return `
+    <tr>
+      <td class="jan">${esc(it.jan)}</td>
+      <td>${esc(it.name)}</td>
+      <td class="num">${fmt(iq)}</td>
+      <td class="num">¥${fmt(it.price)}</td>
+      <td class="num">¥${fmt(totalOf(it))}</td>
+      <td>${near ? esc(near) : '—'}${info?`<span class="badge ${info.cls}">${info.label}</span>`:''}
+        ${multiLot?`<br><button class="lots-toggle" data-lots="${it.id}">期限別内訳 ▾</button>`:''}
+      </td>
+      <td class="note-cell">${esc(it.note||'')}</td>
+      <td class="row-actions">
+        <button class="edit" data-edit="${it.id}">編集</button>
+        <button class="del" data-del="${it.id}">削除</button>
+      </td>
+    </tr>
+    ${multiLot?`<tr class="lots-detail" id="lots-${it.id}" style="display:none"><td></td><td colspan="7">
+      <table><tr><th>消費期限</th><th style="text-align:right">在庫数</th></tr>${lotRows}</table>
+    </td></tr>`:''}`;
+  }).join('');
+
+  return `
+  <div class="crumb"><a href="#" data-goto-top>← TOPへ戻る</a></div>
+  <div class="page-head">
+    <h1>${esc(b.name)}
+      <span class="sub-actions">
+        <button data-rename-biz="${b.id}">名称変更</button> ／
+        <button data-del-biz="${b.id}">事業者を削除</button>
+      </span>
+    </h1>
+    <div class="head-actions">
+      <button class="btn" data-goto-bulk data-biz="${b.id}">Excelで一括登録</button>
+      <button class="btn" data-goto-import="${b.id}">発注書取込</button>
+      <button class="btn btn-primary" data-goto-form data-biz="${b.id}">＋ 新規在庫登録</button>
+    </div>
+  </div>
+  <div class="band">
+    <div class="cell"><div class="label">${esc(b.name)} の在庫総数</div><div class="value">${fmt(q)}<span class="unit">点</span></div></div>
+    <div class="cell"><div class="label">${esc(b.name)} の在庫総額</div><div class="value">¥${fmt(t)}</div></div>
+  </div>
+  <div class="toolbar">
+    <div class="section-title" style="border:none;margin:0;padding:0">在庫一覧(${fmt(its.length)} 品目)</div>
+    <input class="search-box" id="kw" placeholder="JAN・商品名で絞り込み" value="${esc(kw)}">
+  </div>
+  ${its.length ? `
+  <div class="table-wrap"><table class="inv">
+    <thead><tr>
+      <th>対象JAN</th><th>商品名</th><th class="num">在庫数</th><th class="num">単価</th><th class="num">総額</th><th>消費期限</th><th>備考</th><th></th>
+    </tr></thead>
+    <tbody>${rows || `<tr><td colspan="8" style="text-align:center;color:var(--sub)">絞り込みに一致する商品がありません</td></tr>`}</tbody>
+  </table></div>`
+  : `<div class="empty">この事業者にはまだ在庫が登録されていません。<br><button class="btn btn-primary" data-goto-form data-biz="${b.id}">＋ 新規在庫登録</button></div>`}
+  `;
+}
+
+/* ---------- 登録・編集フォーム ---------- */
+function viewForm(r){
+  const edit = r.editId ? state.items.find(i=>i.id===r.editId) : null;
+  const bizId = edit ? edit.businessId : (r.bizId || '');
+  const options = state.businesses.map(b=>`<option value="${b.id}" ${b.id===bizId?'selected':''}>${esc(b.name)}</option>`).join('');
+  const lots = edit ? sortedLotsFIFO(edit.lots) : [{expiry:null, qty:''}];
+  const lotRows = lots.map(l=>lotRowHTML(l.expiry, l.qty)).join('');
+  const backTo = edit ? {view:'biz', bizId: edit.businessId} : (r.bizId ? {view:'biz', bizId:r.bizId} : {view:'top'});
+  return `
+  <div class="crumb"><a href="#" data-back='${JSON.stringify(backTo)}'>← 戻る</a></div>
+  <div class="page-head"><h1>${edit?'在庫を編集':'新規在庫登録'}</h1></div>
+  <div class="form-card">
+    <div class="form-error" id="form-error"></div>
+    <div class="field">
+      <label>事業者</label>
+      <select id="f-biz" ${edit?'disabled':''}><option value="">選択してください</option>${options}</select>
+    </div>
+    <div class="field">
+      <label>対象JAN</label>
+      <input id="f-jan" inputmode="numeric" maxlength="14" placeholder="例:4970578800318" value="${edit?esc(edit.jan):''}">
+      <div class="hint">数字8〜14桁。同じJANの商品はシステム全体で1件のみ登録できます。</div>
+    </div>
+    <div class="field">
+      <label>商品名</label>
+      <input id="f-name" placeholder="例:まんまる瓶パステルキャンディー【手まり玉】" value="${edit?esc(edit.name):''}">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>単価(単品での価格)</label>
+        <input id="f-price" type="number" min="0" step="1" placeholder="例:316" value="${edit?edit.price:''}">
+      </div>
+      <div class="field" style="align-self:flex-end">
+        <div class="calc-total">総額(自動計算):<b id="f-total">¥0</b></div>
+      </div>
+    </div>
+    <div class="field">
+      <label>在庫数と消費期限<span class="opt">※期限は空欄でも登録できます</span></label>
+      <div class="lots-editor" id="lots-editor">${lotRows}
+        <button class="btn btn-sm" id="add-lot" type="button">＋ 消費期限の違う在庫を追加</button>
+      </div>
+      <div class="hint">同じ商品で消費期限が異なる在庫は、行を分けると期限ごとの在庫数を確認できます。発注書取込時は期限の近いものから自動で引き落とします。</div>
+    </div>
+    <div class="field">
+      <label>備考<span class="opt">メモ欄</span></label>
+      <textarea id="f-note" rows="2">${edit?esc(edit.note||''):''}</textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" id="save-item">${edit?'変更を保存':'登録する'}</button>
+      <button class="btn" data-back='${JSON.stringify(backTo)}'>キャンセル</button>
+    </div>
+  </div>`;
+}
+function lotRowHTML(expiry, qty){
+  return `<div class="lot-row">
+    <input type="date" class="lot-exp" value="${expiry||''}">
+    <input type="number" class="lot-qty" min="0" step="1" placeholder="在庫数" value="${qty===''?'':fmtRaw(qty)}">
+    <span style="font-size:13px;color:var(--sub)">点</span>
+    <button class="rm" type="button">この行を削除</button>
+  </div>`;
+}
+const fmtRaw = n => Number(n)||0;
+
+/* ---------- 発注書取込 ---------- */
+function viewImport(bizId){
+  const b = bizOf(bizId);
+  if (!b) return viewTop();
+  const st = importState && importState.bizId===bizId ? importState : null;
+  const step = st ? (st.applied ? 3 : 2) : 1;
+  const stepper = `
+  <div class="stepper">
+    <span class="step ${step===1?'on':'done'}">1. 発注書PDFを読み込む</span>
+    <span class="step ${step===2?'on':step>2?'done':''}">2. 差分を確認して承認</span>
+    <span class="step ${step===3?'on':''}">3. 修正済みPDFを出力</span>
+  </div>`;
+
+  let body = '';
+  if (step===1){
+    body = `
+    <div class="drop" id="drop">
+      発注書のPDFファイルをここにドラッグ&ドロップ<br>
+      <span style="font-size:13px">対応形式:JANコード/製品/数量/価格/総額 の明細表があるPDF</span><br>
+      <button class="btn btn-primary" id="pick-file">ファイルを選択</button>
+      <input type="file" id="file-input" accept=".pdf,application/pdf" style="display:none">
+    </div>
+    <div id="parse-error" class="form-error" style="margin-top:14px"></div>`;
+  }
+  else if (step===2){
+    const p = st;
+    const nDel = p.rows.filter(r=>r.action==='delete').length;
+    const nRed = p.rows.filter(r=>r.action==='reduce').length;
+    const nNone = p.rows.filter(r=>r.action==='none').length;
+    const rowHtml = p.rows.map(r=>{
+      const badge = r.action==='delete' ? '<span class="badge blue">行削除</span>'
+                  : r.action==='reduce' ? '<span class="badge warn">数量減算</span>'
+                  : `<span class="badge muted">変更なし</span>`;
+      const qtyCell = r.action==='delete' ? `<span class="strike">${fmt(r.qty)}</span> → <span class="after-val">削除</span>`
+                    : r.action==='reduce' ? `<span class="strike">${fmt(r.qty)}</span> → <span class="after-val">${fmt(r.newQty)}</span>`
+                    : fmt(r.qty);
+      const amtCell = r.action==='delete' ? `<span class="strike">¥${fmt(r.total)}</span>`
+                    : r.action==='reduce' ? `<span class="strike">¥${fmt(r.total)}</span> → <span class="after-val">¥${fmt(r.newTotal)}</span>`
+                    : '¥'+fmt(r.total);
+      return `<tr>
+        <td class="jan">${esc(r.jan)}</td><td>${esc(r.name)}${r.noteMsg?`<br><span style="font-size:12px;color:var(--sub)">${r.noteMsg}</span>`:''}</td>
+        <td class="num">${fmt(r.stock)}</td>
+        <td class="num">${qtyCell}</td>
+        <td class="num">${amtCell}</td>
+        <td>${badge}</td>
+      </tr>`;
+    }).join('');
+    const deductHtml = p.rows.filter(r=>r.deduction.length).map(r=>{
+      const d = r.deduction.map(x=>`${x.expiry||'期限なし'}:−${fmt(x.take)}点`).join(' ／ ');
+      return `<tr><td class="jan">${esc(r.jan)}</td><td>${esc(r.name)}</td><td class="num">−${fmt(r.deduction.reduce((a,x)=>a+x.take,0))} 点</td><td style="font-size:12.5px;color:var(--sub)">${d}</td></tr>`;
+    }).join('');
+    body = `
+    <p style="font-size:14px;margin-bottom:4px">読み込んだファイル:<b>${esc(p.fileName)}</b>(${p.rows.length} 行)</p>
+    <div class="import-summary">
+      <span class="pill">行削除(在庫で充足)<b style="color:var(--blue-dark)">${nDel}</b></span>
+      <span class="pill">数量減算<b style="color:var(--amber)">${nRed}</b></span>
+      <span class="pill">変更なし<b>${nNone}</b></span>
+      <span class="pill">発注金額 <span class="strike">¥${fmt(p.origSubtotal)}</span> → <b style="color:var(--blue-dark)">¥${fmt(p.newSubtotal)}</b></span>
+    </div>
+    <div class="table-wrap"><table class="inv">
+      <thead><tr><th>JANコード</th><th>製品</th><th class="num">現在庫</th><th class="num">発注数量</th><th class="num">総額</th><th>処理</th></tr></thead>
+      <tbody>${rowHtml}</tbody>
+    </table></div>
+    ${deductHtml?`
+    <div class="section-title" style="margin-top:26px">在庫からの引き落とし内容(期限の近いロットから消費)</div>
+    <div class="table-wrap"><table class="inv">
+      <thead><tr><th>JANコード</th><th>商品名</th><th class="num">引き落とし数</th><th>期限別の内訳</th></tr></thead>
+      <tbody>${deductHtml}</tbody>
+    </table></div>`:''}
+    <div class="import-note">「承認して在庫を更新」を押すと、上記の内容で在庫データを減算し、修正済み発注書のPDF出力が可能になります。承認するまで在庫は変更されません。</div>
+    <div class="import-actions">
+      <button class="btn btn-primary" id="approve-import">承認して在庫を更新</button>
+      <button class="btn" id="cancel-import">やり直す</button>
+    </div>`;
+  }
+  else {
+    body = `
+    <div class="done-box">
+      <div class="big">在庫の更新が完了しました</div>
+      <p style="font-size:14px;color:var(--sub);margin-bottom:18px">修正後の発注金額:<b style="color:var(--ink)">¥${fmt(st.newSubtotal)}</b>(${st.outRows().length} 行)</p>
+      <div class="import-actions" style="justify-content:center">
+        <button class="btn btn-primary" id="export-pdf">修正済み発注書をPDF出力</button>
+        <button class="btn" data-goto-biz-btn="${bizId}">在庫一覧を確認する</button>
+      </div>
+      <p id="pdf-status" style="font-size:13px;color:var(--sub);margin-top:12px"></p>
+    </div>`;
+  }
+  return `
+  <div class="crumb"><a href="#" data-goto-biz-link="${bizId}">← ${esc(b.name)} の在庫一覧へ戻る</a></div>
+  <div class="page-head"><h1>発注書取込 <span style="font-size:14px;color:var(--sub);font-weight:400">/ ${esc(b.name)}</span></h1></div>
+  ${stepper}${body}`;
+}
+
+/* =========================================================
+   発注書PDFの解析
+========================================================= */
+const RAD_MAP = {'\u2ec4':'西','\u2ee9':'黄','\u2ed1':'長','\u2ed8':'青','\u2edd':'食','\u2ee4':'鬼','\u2eef':'竜','\u2eed':'歯','\u2ef2':'亀','\u2eeb':'麦','\u2ee1':'斉','\u2e9f':'母','\u2f8a':'民'};
+function normJa(s){
+  return s.normalize('NFKC').replace(/[\u2e80-\u2eff\u2f00-\u2fdf]/g, c => RAD_MAP[c] || c.normalize('NFKC'));
+}
+
+async function parseOrderPdf(file){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buf = await file.arrayBuffer();
+  const doc = await pdfjsLib.getDocument({data:buf}).promise;
+  const allLines = [];
+  for (let p=1; p<=doc.numPages; p++){
+    const page = await doc.getPage(p);
+    const width = page.getViewport({scale:1}).width;
+    const thr = width * 0.55;   // ヘッダー左右分割の境界
+    const tc = await page.getTextContent();
+    const byY = {};
+    tc.items.forEach(it=>{
+      if (!it.str.trim()) return;
+      const y = Math.round(it.transform[5]/2)*2;
+      (byY[y] = byY[y] || []).push({x:it.transform[4], w:it.width, s:it.str});
+    });
+    const joinParts = parts=>{
+      let line='', prevEnd=null;
+      parts.forEach(pt=>{
+        if (prevEnd!==null && pt.x - prevEnd > 2) line += ' ';
+        line += pt.s; prevEnd = pt.x + pt.w;
+      });
+      // PDF内部の康熙部首などを通常の漢字に正規化(NFKC+CJK部首補助の手動マップ)
+      return normJa(line.trim());
+    };
+    const ys = Object.keys(byY).map(Number).sort((a,b)=>b-a);
+    ys.forEach(y=>{
+      const parts = byY[y].sort((a,b)=>a.x-b.x);
+      allLines.push({
+        page:p,
+        text: joinParts(parts),
+        left: joinParts(parts.filter(pt=>pt.x < thr)),
+        right: joinParts(parts.filter(pt=>pt.x >= thr)),
+      });
+    });
+  }
+  // 明細行の抽出
+  const rowRe = /^(\d{8,14})\s+(.+)\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)$/;
+  const rows = [];
+  const headerLines = [];
+  let firstRowSeen = false;
+  let origSubtotal = null;
+  allLines.forEach(l=>{
+    const t = l.text;
+    const m = t.match(rowRe);
+    if (m){
+      firstRowSeen = true;
+      rows.push({ jan:m[1], name:m[2].replace(/\s+/g,''), qty:+m[3].replace(/,/g,''), price:+m[4].replace(/,/g,''), total:+m[5].replace(/,/g,'') });
+      return;
+    }
+    const sm = t.match(/小計\s*[¥\\]?\s*([\d,]+)/);
+    if (sm){ origSubtotal = +sm[1].replace(/,/g,''); return; }
+    if (l.page===1 && !firstRowSeen) headerLines.push(l);
+  });
+  if (!rows.length) throw new Error('明細行(JANコード/製品/数量/価格/総額)を読み取れませんでした。発注書のフォーマットをご確認ください。');
+
+  // ヘッダー情報の抽出(左=発注先まわり/右=発注元の会社情報ブロック)
+  const meta = { orderNo:'', client:'', companyLines:[] };
+  const isOrderNo = t => /^[\d]{4}-[\d]{2}-[\d]{2}-[\d-]+$/.test(t) || /^[\d-]{14,}$/.test(t);
+  headerLines.forEach(l=>{
+    if (l.text.includes('JANコード')) return;          // 表ヘッダー行は除外
+    if (l.right){
+      if (isOrderNo(l.right)) meta.orderNo = l.right;   // 発注番号が右上にある形式
+      else meta.companyLines.push(l.right);
+    }
+    const t = l.left;
+    if (!t) return;
+    if (isOrderNo(t)){ meta.orderNo = t; return; }
+    if (t.includes('御中')){ meta.client = t.replace(/\s*御中\s*$/,'').trim(); return; }
+  });
+  return { rows, meta, origSubtotal: origSubtotal ?? rows.reduce((a,r)=>a+r.total,0) };
+}
+
+/* ---------- 突合プランの作成 ---------- */
+function buildPlan(parsed, bizId, fileName){
+  const its = itemsOf(bizId);
+  // 作業用の在庫コピー(同一JANが発注書内で複数行あっても正しく処理)
+  const work = {};
+  its.forEach(i=>{ work[i.jan] = { item:i, lots: sortedLotsFIFO(i.lots).map(l=>({...l})) }; });
+
+  const rows = parsed.rows.map(r=>{
+    const w = work[r.jan];
+    const otherBiz = !w && state.items.find(i=>i.jan===r.jan);
+    const stock = w ? w.lots.reduce((a,l)=>a+(+l.qty||0),0) : 0;
+    let action='none', newQty=r.qty, newTotal=r.total, deduction=[], noteMsg='';
+    if (!w){
+      noteMsg = otherBiz ? `※未登録(「${esc(bizOf(otherBiz.businessId)?.name||'')}」に同一JANの在庫あり)` : '※この事業者に未登録のJANです';
+    } else if (stock <= 0){
+      noteMsg = '※在庫0のため変更なし';
+    } else {
+      const take = Math.min(stock, r.qty);
+      let rest = take;
+      w.lots.forEach(l=>{
+        if (rest<=0 || !l.qty) return;
+        const d = Math.min(l.qty, rest);
+        l.qty -= d; rest -= d;
+        deduction.push({expiry:l.expiry, take:d});
+      });
+      if (stock >= r.qty){ action='delete'; newQty=0; newTotal=0; }
+      else { action='reduce'; newQty=r.qty-stock; newTotal=newQty*r.price; }
+    }
+    return {...r, stock, action, newQty, newTotal, deduction, noteMsg, itemId: w?w.item.id:null};
+  });
+  const newSubtotal = rows.reduce((a,r)=> a + (r.action==='delete'?0 : r.action==='reduce'?r.newTotal : r.total), 0);
+  return {
+    bizId, fileName, meta: parsed.meta, rows,
+    origSubtotal: parsed.origSubtotal, newSubtotal, applied:false,
+    outRows(){ return this.rows.filter(r=>r.action!=='delete').map(r=> r.action==='reduce' ? {...r, qty:r.newQty, total:r.newTotal} : r); }
+  };
+}
+
+function applyPlan(p){
+  p.rows.forEach(r=>{
+    if (!r.itemId || !r.deduction.length) return;
+    const it = state.items.find(i=>i.id===r.itemId);
+    if (!it) return;
+    let lots = sortedLotsFIFO(it.lots);
+    r.deduction.forEach(d=>{
+      const lot = lots.find(l=> (l.expiry||null)===(d.expiry||null) && l.qty>0);
+      if (lot) lot.qty = Math.max(0, lot.qty - d.take);
+    });
+    it.lots = lots.filter(l=>l.qty>0);
+    if (!it.lots.length) it.lots = [{expiry:null, qty:0}];
+  });
+  p.applied = true;
+  saveState();
+}
+
+/* =========================================================
+   修正済み発注書のPDF出力(元レイアウトを再現)
+========================================================= */
+async function exportOrderPdf(p){
+  const status = document.getElementById('pdf-status');
+  status.textContent = 'PDFを生成しています…';
+  await document.fonts.ready;
+
+  const rows = p.outRows();
+  const PAGE1_ROWS = 20, PAGEN_ROWS = 30;
+  const chunks = [];
+  let rest = [...rows];
+  chunks.push(rest.splice(0, PAGE1_ROWS));
+  while (rest.length) chunks.push(rest.splice(0, PAGEN_ROWS));
+
+  const m = p.meta;
+  const companyHtml = m.companyLines.map(l=>esc(l)).join('<br>');
+  const work = document.getElementById('pdf-work');
+  work.innerHTML = '';
+  const pages = [];
+
+  chunks.forEach((chunk, idx)=>{
+    const isFirst = idx===0, isLast = idx===chunks.length-1;
+    const trs = chunk.map(r=>`<tr>
+      <td>${esc(r.jan)}</td><td>${esc(r.name)}</td>
+      <td class="num">${fmt(r.qty)}</td><td class="num">${fmt(r.price)}</td><td class="num">${fmt(r.total)}</td>
+    </tr>`).join('');
+    const el = document.createElement('div');
+    el.className = 'pdf-page';
+    el.innerHTML = `
+      ${isFirst ? `
+        <div class="order-no">${esc(m.orderNo)}</div>
+        <div class="pdf-title">発注書</div>
+        <div class="pdf-head">
+          <div class="client">
+            <div class="client-name">${esc(m.client||'')} 御中</div>
+            <p>ご担当者 様</p>
+            <p>以下の通り注文いたします。</p>
+            <p>発注金額 : ¥</p>
+          </div>
+          <div class="company">${companyHtml}</div>
+        </div>` : ''}
+      <table class="od">
+        <thead><tr><th style="width:118px">JANコード</th><th>製品</th><th style="width:56px">数量</th><th style="width:64px">価格</th><th style="width:80px">総額</th></tr></thead>
+        <tbody>${trs}</tbody>
+      </table>
+      ${isLast ? `
+      <table class="totals" style="margin-top:14px">
+        <tr><td class="lbl">小計</td><td class="num">¥${fmt(p.newSubtotal)}</td></tr>
+        <tr><td class="lbl">消費税</td><td class="num"></td></tr>
+        <tr><td class="lbl">総合計</td><td class="num"></td></tr>
+      </table>` : ''}
+      <div class="page-no">Page ${idx+1}/${chunks.length}</div>`;
+    work.appendChild(el);
+    pages.push(el);
+  });
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF('p','mm','a4');
+  for (let i=0; i<pages.length; i++){
+    const canvas = await html2canvas(pages[i], {scale:2, backgroundColor:'#ffffff'});
+    if (i>0) pdf.addPage();
+    pdf.addImage(canvas.toDataURL('image/jpeg', .92), 'JPEG', 0, 0, 210, 297);
+    status.textContent = `PDFを生成しています…(${i+1}/${pages.length}ページ)`;
+  }
+  const d = new Date();
+  const ymd = d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  pdf.save(`発注書_修正済_${p.meta.client||'発注先'}_${ymd}.pdf`);
+  work.innerHTML = '';
+  status.textContent = 'PDFを出力しました。ダウンロードフォルダをご確認ください。';
+}
+
+/* =========================================================
+   Excel一括登録
+========================================================= */
+function viewBulk(bizId){
+  const b = bizId ? bizOf(bizId) : null;
+  const st = bulkState && bulkState.key === (bizId||'') ? bulkState : null;
+  const step = st ? (st.applied ? 3 : 2) : 1;
+  const back = b ? `<a href="#" data-goto-biz-link="${b.id}">← ${esc(b.name)} の在庫一覧へ戻る</a>` : `<a href="#" data-goto-top>← TOPへ戻る</a>`;
+  const stepper = `
+  <div class="stepper">
+    <span class="step ${step===1?'on':'done'}">1. Excelファイルを読み込む</span>
+    <span class="step ${step===2?'on':step>2?'done':''}">2. 内容を確認して登録</span>
+    <span class="step ${step===3?'on':''}">3. 完了</span>
+  </div>`;
+
+  let body = '';
+  if (step===1){
+    body = `
+    <div class="drop" id="bulk-drop">
+      入力済みのExcelファイル(.xlsx)をここにドラッグ&ドロップ<br>
+      <span style="font-size:13px">列構成:事業者名/対象JAN/商品名/在庫数/単価/消費期限/備考(配布フォーマット対応)</span><br>
+      <button class="btn btn-primary" id="bulk-pick">ファイルを選択</button>
+      <input type="file" id="bulk-file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="display:none">
+    </div>
+    ${b?`<div class="import-note">このページから取り込む場合、Excelの「事業者名」が空欄の行は「${esc(b.name)}」の在庫として登録されます。</div>`:''}
+    <div id="bulk-error" class="form-error" style="margin-top:14px"></div>`;
+  }
+  else if (step===2){
+    const c = st.counts();
+    const rowHtml = st.entries.map(e=>{
+      const badge = e.status==='new' ? '<span class="badge blue">登録</span>'
+                  : e.status==='skip' ? '<span class="badge warn">スキップ</span>'
+                  : '<span class="badge danger">エラー</span>';
+      const lotTxt = e.lots.map(l=>`${l.expiry||'期限なし'}:${fmt(l.qty)}点`).join('<br>') || '—';
+      const qty = e.lots.reduce((a,l)=>a+l.qty,0);
+      return `<tr>
+        <td>${esc(e.bizName||'')}${e.createBiz&&e.status==='new'?'<span class="badge blue">新規作成</span>':''}</td>
+        <td class="jan">${esc(e.jan)}</td>
+        <td>${esc(e.name)}${e.msg?`<br><span style="font-size:12px;color:${e.status==='error'?'var(--red)':'var(--sub)'}">${e.msg}</span>`:''}</td>
+        <td class="num">${fmt(qty)}</td>
+        <td class="num">${e.price===''||isNaN(+e.price)?'—':'¥'+fmt(e.price)}</td>
+        <td style="font-size:13px">${lotTxt}</td>
+        <td>${badge}</td>
+      </tr>`;
+    }).join('');
+    body = `
+    <p style="font-size:14px;margin-bottom:4px">読み込んだファイル:<b>${esc(st.fileName)}</b></p>
+    <div class="import-summary">
+      <span class="pill">登録<b style="color:var(--blue-dark)">${c.n}</b> 品目</span>
+      <span class="pill">スキップ(登録済みJAN)<b style="color:var(--amber)">${c.s}</b></span>
+      <span class="pill">エラー<b style="color:var(--red)">${c.e}</b></span>
+    </div>
+    <div class="table-wrap"><table class="inv">
+      <thead><tr><th>事業者</th><th>対象JAN</th><th>商品名</th><th class="num">在庫数</th><th class="num">単価</th><th>消費期限(ロット)</th><th>判定</th></tr></thead>
+      <tbody>${rowHtml}</tbody>
+    </table></div>
+    ${c.e?'<div class="import-note" style="background:var(--red-bg);color:var(--red)">エラーの品目は登録されません。Excelを修正して読み込み直すか、このまま登録可能な品目のみ確定できます。</div>':''}
+    <div class="import-actions">
+      <button class="btn btn-primary" id="bulk-approve" ${c.n?'':'disabled'}>登録を確定する(${c.n} 品目)</button>
+      <button class="btn" id="bulk-cancel">やり直す</button>
+    </div>`;
+  }
+  else {
+    const c = st.counts();
+    body = `
+    <div class="done-box">
+      <div class="big">${c.n} 品目を登録しました</div>
+      <p style="font-size:14px;color:var(--sub);margin-bottom:18px">スキップ:${c.s} 件 ／ エラー:${c.e} 件</p>
+      <div class="import-actions" style="justify-content:center">
+        <button class="btn btn-primary" id="bulk-back">在庫を確認する</button>
+      </div>
+    </div>`;
+  }
+  return `
+  <div class="crumb">${back}</div>
+  <div class="page-head"><h1>Excelで一括登録 ${b?`<span style="font-size:14px;color:var(--sub);font-weight:400">/ ${esc(b.name)}</span>`:''}</h1></div>
+  ${stepper}${body}`;
+}
+
+function janStr(v){
+  if (typeof v === 'number') return String(Math.round(v));
+  return String(v).trim().replace(/\s/g,'');
+}
+function parseExpiryCell(v){
+  if (v==='' || v===null || v===undefined) return {val:null};
+  if (v instanceof Date) return {val:`${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`};
+  if (typeof v === 'number'){
+    if (v>20000 && v<80000){  // Excelの日付シリアル値
+      const d = new Date(Date.UTC(1899,11,30) + Math.round(v)*86400000);
+      return {val:`${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`};
+    }
+    return {err:'消費期限を日付として読み取れません'};
+  }
+  const m = String(v).trim().match(/^(\d{4})[年/\-.](\d{1,2})[月/\-.](\d{1,2})日?$/);
+  if (m) return {val:`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`};
+  return {err:'消費期限の形式が不正です(例:2026/12/31)'};
+}
+const BULK_HEADERS = ['事業者名','対象JAN','商品名','在庫数','単価','消費期限','備考'];
+async function parseExcelBook(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const name = wb.SheetNames.includes('登録データ') ? '登録データ' : wb.SheetNames[0];
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, raw:true, defval:''});
+  let hIdx = -1; const cols = {};
+  for (let i=0; i<Math.min(aoa.length,20); i++){
+    const row = aoa[i].map(c=>String(c).trim());
+    if (row.includes('対象JAN')){
+      hIdx = i;
+      BULK_HEADERS.forEach(h=>cols[h]=row.indexOf(h));
+      break;
+    }
+  }
+  if (hIdx<0 || ['対象JAN','商品名','在庫数','単価'].some(h=>cols[h]<0))
+    throw new Error('ヘッダー行(対象JAN/商品名/在庫数/単価 など)が見つかりませんでした。配布したフォーマットファイルの「登録データ」シートに入力してください。');
+  const out = [];
+  for (let i=hIdx+1; i<aoa.length; i++){
+    const r = aoa[i];
+    const get = h => cols[h]>=0 ? (r[cols[h]] ?? '') : '';
+    if (BULK_HEADERS.every(h=>String(get(h)).trim()==='')) continue;
+    out.push({
+      line: i+1,
+      bizName: String(get('事業者名')).trim(),
+      jan: janStr(get('対象JAN')),
+      name: String(get('商品名')).trim(),
+      qty: get('在庫数'), price: get('単価'),
+      expiry: get('消費期限'),
+      note: String(get('備考')).trim()
+    });
+  }
+  if (!out.length) throw new Error('データ行がありません。「登録データ」シートに入力してください。');
+  return out;
+}
+function buildBulkPlan(rows, defaultBizId, fileName){
+  const groups = new Map();
+  rows.forEach(r=>{
+    const g = groups.get(r.jan) || {rows:[]};
+    g.rows.push(r); groups.set(r.jan, g);
+  });
+  const entries = [];
+  groups.forEach((g, jan)=>{
+    const f = g.rows[0];
+    const lines = g.rows.map(r=>r.line);
+    const e = {jan, name:f.name, price:f.price, note:f.note, bizName:f.bizName, lots:[], status:'new', msg:'', createBiz:false, bizId:null};
+    const errs = [];
+    if (!/^\d{8,14}$/.test(jan)) errs.push('JANは数字8〜14桁で入力してください');
+    if (!e.name) errs.push('商品名が空欄です');
+    const priceN = Number(e.price);
+    if (e.price==='' || isNaN(priceN) || priceN<0) errs.push('単価が不正です'); else e.price = priceN;
+    g.rows.forEach(r=>{
+      if (r.name!==e.name || r.bizName!==e.bizName || Number(r.price)!==priceN)
+        errs.push(`同一JANの行(${lines.join(',')}行目)で商品名・単価・事業者名が一致していません`);
+      const q = Number(r.qty);
+      if (r.qty==='' || isNaN(q) || q<0){ errs.push(`${r.line}行目:在庫数が不正です`); return; }
+      const ex = parseExpiryCell(r.expiry);
+      if (ex.err){ errs.push(`${r.line}行目:${ex.err}`); return; }
+      const same = e.lots.find(l=>(l.expiry||null)===(ex.val||null));
+      if (same) same.qty += q; else e.lots.push({expiry:ex.val, qty:q});
+      if (r.note && !e.note) e.note = r.note;
+    });
+    if (e.bizName){
+      const bb = state.businesses.find(x=>x.name===e.bizName);
+      if (bb) e.bizId = bb.id; else e.createBiz = true;
+    } else if (defaultBizId){
+      e.bizId = defaultBizId; e.bizName = bizOf(defaultBizId).name;
+    } else errs.push('事業者名が空欄です(TOPから取り込む場合は必須)');
+    const dup = state.items.find(i=>i.jan===jan);
+    if (errs.length){ e.status='error'; e.msg=[...new Set(errs)].join(' ／ '); }
+    else if (dup){ e.status='skip'; e.msg=`同一JAN商品(在庫)が存在します:「${bizOf(dup.businessId)?.name||''}」の「${dup.name}」`; }
+    entries.push(e);
+  });
+  return {
+    key: defaultBizId||'', fileName, entries, applied:false,
+    counts(){ return {
+      n:this.entries.filter(x=>x.status==='new').length,
+      s:this.entries.filter(x=>x.status==='skip').length,
+      e:this.entries.filter(x=>x.status==='error').length };
+    }
+  };
+}
+function applyBulk(p){
+  const created = {};
+  p.entries.forEach(e=>{
+    if (e.status!=='new') return;
+    let bid = e.bizId;
+    if (!bid){
+      const ex = state.businesses.find(b=>b.name===e.bizName);
+      if (ex) bid = ex.id;
+      else if (created[e.bizName]) bid = created[e.bizName];
+      else { bid = uid(); state.businesses.push({id:bid, name:e.bizName}); created[e.bizName] = bid; }
+    }
+    state.items.push({id:uid(), businessId:bid, jan:e.jan, name:e.name, price:e.price, note:e.note, lots:e.lots.length?e.lots:[{expiry:null, qty:0}]});
+  });
+  p.applied = true;
+  saveState();
+}
+
+/* =========================================================
+   モーダル
+========================================================= */
+function showModal({title, bodyHTML, buttons}){
+  const back = document.getElementById('modal-back');
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHTML || '';
+  const act = document.getElementById('modal-actions');
+  act.innerHTML = '';
+  buttons.forEach(b=>{
+    const btn = document.createElement('button');
+    btn.className = 'btn ' + (b.cls||'');
+    btn.textContent = b.label;
+    btn.onclick = ()=>{ if (b.cb && b.cb()===false) return; back.classList.remove('show'); };
+    act.appendChild(btn);
+  });
+  back.classList.add('show');
+}
+
+/* =========================================================
+   イベント
+========================================================= */
+function bindEvents(){
+  const app = document.getElementById('app');
+
+  app.querySelectorAll('[data-goto-top]').forEach(el=>el.onclick=e=>{e.preventDefault();go({view:'top'});});
+  app.querySelectorAll('[data-goto-biz]').forEach(el=>el.onclick=()=>go({view:'biz', bizId:el.dataset.gotoBiz}));
+  app.querySelectorAll('[data-goto-biz-btn]').forEach(el=>el.onclick=()=>{importState=null;go({view:'biz', bizId:el.dataset.gotoBizBtn});});
+  app.querySelectorAll('[data-goto-biz-link]').forEach(el=>el.onclick=e=>{e.preventDefault();go({view:'biz', bizId:el.dataset.gotoBizLink});});
+  app.querySelectorAll('[data-goto-form]').forEach(el=>el.onclick=()=>go({view:'form', bizId:el.dataset.biz||''}));
+  app.querySelectorAll('[data-goto-import]').forEach(el=>el.onclick=()=>{ if(!importState||importState.bizId!==el.dataset.gotoImport) importState=null; go({view:'import', bizId:el.dataset.gotoImport}); });
+  app.querySelectorAll('[data-back]').forEach(el=>el.onclick=e=>{e.preventDefault();go(JSON.parse(el.dataset.back));});
+
+  // 事業者追加
+  const addBiz = document.getElementById('add-biz-btn');
+  if (addBiz) addBiz.onclick = ()=>{
+    const inp = document.getElementById('new-biz-name');
+    const name = inp.value.trim();
+    if (!name) { inp.focus(); return; }
+    if (state.businesses.some(b=>b.name===name)){
+      showModal({title:'登録できません', bodyHTML:'同じ名前の事業者がすでに存在します。', buttons:[{label:'閉じる', cls:'btn-primary'}]});
+      return;
+    }
+    state.businesses.push({id:uid(), name});
+    saveState(); render();
+  };
+  const bizInput = document.getElementById('new-biz-name');
+  if (bizInput) bizInput.onkeydown = e=>{ if(e.key==='Enter') addBiz.click(); };
+
+  // 事業者の名称変更/削除
+  app.querySelectorAll('[data-rename-biz]').forEach(el=>el.onclick=()=>{
+    const b = bizOf(el.dataset.renameBiz);
+    showModal({title:'事業者名の変更', bodyHTML:`<input id="m-input" value="${esc(b.name)}">`, buttons:[
+      {label:'キャンセル'},
+      {label:'変更する', cls:'btn-primary', cb:()=>{
+        const v = document.getElementById('m-input').value.trim();
+        if (!v) return false;
+        b.name = v; saveState(); render();
+      }}
+    ]});
+  });
+  app.querySelectorAll('[data-del-biz]').forEach(el=>el.onclick=()=>{
+    const b = bizOf(el.dataset.delBiz);
+    const n = itemsOf(b.id).length;
+    showModal({title:'事業者の削除', bodyHTML:`「${esc(b.name)}」を削除します。登録済みの在庫 ${n} 品目もすべて削除されます。よろしいですか?`, buttons:[
+      {label:'キャンセル'},
+      {label:'削除する', cls:'btn-danger', cb:()=>{
+        state.items = state.items.filter(i=>i.businessId!==b.id);
+        state.businesses = state.businesses.filter(x=>x.id!==b.id);
+        saveState(); go({view:'top'});
+      }}
+    ]});
+  });
+
+  // 在庫一覧:絞り込み/内訳/編集/削除
+  const kw = document.getElementById('kw');
+  if (kw) kw.oninput = ()=>{ route.kw = kw.value; render(); const k=document.getElementById('kw'); k.focus(); k.setSelectionRange(k.value.length,k.value.length); };
+  app.querySelectorAll('[data-lots]').forEach(el=>el.onclick=()=>{
+    const tr = document.getElementById('lots-'+el.dataset.lots);
+    const open = tr.style.display!=='none';
+    tr.style.display = open?'none':'';
+    el.textContent = open?'期限別内訳 ▾':'期限別内訳 ▴';
+  });
+  app.querySelectorAll('[data-edit]').forEach(el=>el.onclick=()=>go({view:'form', editId:el.dataset.edit}));
+  app.querySelectorAll('[data-del]').forEach(el=>el.onclick=()=>{
+    const it = state.items.find(i=>i.id===el.dataset.del);
+    showModal({title:'在庫の削除', bodyHTML:`「${esc(it.name)}」(JAN:${esc(it.jan)})を削除します。よろしいですか?`, buttons:[
+      {label:'キャンセル'},
+      {label:'削除する', cls:'btn-danger', cb:()=>{ state.items=state.items.filter(i=>i.id!==it.id); saveState(); render(); }}
+    ]});
+  });
+
+  // フォーム
+  const save = document.getElementById('save-item');
+  if (save){
+    const totalEl = document.getElementById('f-total');
+    const recalc = ()=>{
+      const price = +document.getElementById('f-price').value||0;
+      const q = [...document.querySelectorAll('.lot-qty')].reduce((a,i)=>a+(+i.value||0),0);
+      totalEl.textContent = '¥'+fmt(price*q);
+    };
+    const editor = document.getElementById('lots-editor');
+    const bindLotRows = ()=>{
+      editor.querySelectorAll('.rm').forEach(btn=>btn.onclick=()=>{
+        if (editor.querySelectorAll('.lot-row').length<=1) return;
+        btn.closest('.lot-row').remove(); recalc();
+      });
+      editor.querySelectorAll('.lot-qty').forEach(i=>i.oninput=recalc);
+    };
+    bindLotRows(); recalc();
+    document.getElementById('f-price').oninput = recalc;
+    document.getElementById('add-lot').onclick = ()=>{
+      document.getElementById('add-lot').insertAdjacentHTML('beforebegin', lotRowHTML(null,''));
+      bindLotRows();
+    };
+    save.onclick = ()=>{
+      const err = document.getElementById('form-error');
+      const showErr = html=>{ err.innerHTML=html; err.classList.add('show'); window.scrollTo(0,0); };
+      err.classList.remove('show');
+      const editId = route.editId || null;
+      const edit = editId ? state.items.find(i=>i.id===editId) : null;
+      const bizId = edit ? edit.businessId : document.getElementById('f-biz').value;
+      const jan = document.getElementById('f-jan').value.trim();
+      const name = document.getElementById('f-name').value.trim();
+      const price = document.getElementById('f-price').value;
+      if (!bizId) return showErr('事業者を選択してください。');
+      if (!/^\d{8,14}$/.test(jan)) return showErr('対象JANは数字8〜14桁で入力してください。');
+      if (!name) return showErr('商品名を入力してください。');
+      if (price==='' || +price<0) return showErr('単価を入力してください。');
+      const dup = state.items.find(i=>i.jan===jan && i.id!==editId);
+      if (dup){
+        const dupBiz = bizOf(dup.businessId);
+        showErr(`同一JAN商品(在庫)が存在します。<br>JAN ${esc(jan)} は「${esc(dupBiz?dupBiz.name:'')}」の「${esc(dup.name)}」として登録済みのため、新規登録できません。<br><button class="btn btn-sm" id="goto-dup">登録済みの商品を編集する</button>`);
+        document.getElementById('goto-dup').onclick=()=>go({view:'form', editId:dup.id});
+        return;
+      }
+      const lots = [...document.querySelectorAll('.lot-row')].map(r=>({
+        expiry: r.querySelector('.lot-exp').value || null,
+        qty: +r.querySelector('.lot-qty').value||0
+      })).filter(l=>l.qty>0 || l.expiry);
+      const finalLots = lots.length?lots:[{expiry:null, qty:0}];
+      const note = document.getElementById('f-note').value.trim();
+      if (edit){ Object.assign(edit,{jan,name,price:+price,note,lots:finalLots}); }
+      else state.items.push({id:uid(), businessId:bizId, jan, name, price:+price, note, lots:finalLots});
+      saveState(); go({view:'biz', bizId});
+    };
+  }
+
+  // 発注書取込
+  const drop = document.getElementById('drop');
+  if (drop){
+    const fi = document.getElementById('file-input');
+    document.getElementById('pick-file').onclick=()=>fi.click();
+    fi.onchange=()=>{ if(fi.files[0]) handleFile(fi.files[0]); };
+    drop.ondragover=e=>{e.preventDefault();drop.classList.add('over');};
+    drop.ondragleave=()=>drop.classList.remove('over');
+    drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);};
+  }
+  async function handleFile(file){
+    const errEl = document.getElementById('parse-error');
+    errEl.classList.remove('show');
+    try{
+      const parsed = await parseOrderPdf(file);
+      importState = buildPlan(parsed, route.bizId, file.name);
+      render();
+    }catch(e){
+      errEl.textContent = '読み込みエラー:' + e.message;
+      errEl.classList.add('show');
+    }
+  }
+  const approve = document.getElementById('approve-import');
+  if (approve) approve.onclick=()=>{ applyPlan(importState); render(); };
+  const cancel = document.getElementById('cancel-import');
+  if (cancel) cancel.onclick=()=>{ importState=null; render(); };
+  const exp = document.getElementById('export-pdf');
+  if (exp) exp.onclick=()=>exportOrderPdf(importState);
+
+  // Excel一括登録
+  app.querySelectorAll('[data-goto-bulk]').forEach(el=>el.onclick=()=>{
+    const bid = el.dataset.biz||'';
+    if (!bulkState || bulkState.key!==bid) bulkState = null;
+    go({view:'bulk', bizId:bid});
+  });
+  const bdrop = document.getElementById('bulk-drop');
+  if (bdrop){
+    const fi = document.getElementById('bulk-file');
+    document.getElementById('bulk-pick').onclick=()=>fi.click();
+    fi.onchange=()=>{ if(fi.files[0]) handleBulkFile(fi.files[0]); };
+    bdrop.ondragover=e=>{e.preventDefault();bdrop.classList.add('over');};
+    bdrop.ondragleave=()=>bdrop.classList.remove('over');
+    bdrop.ondrop=e=>{e.preventDefault();bdrop.classList.remove('over'); if(e.dataTransfer.files[0]) handleBulkFile(e.dataTransfer.files[0]);};
+  }
+  async function handleBulkFile(file){
+    const errEl = document.getElementById('bulk-error');
+    errEl.classList.remove('show');
+    try{
+      const rows = await parseExcelBook(file);
+      bulkState = buildBulkPlan(rows, route.bizId||'', file.name);
+      render();
+    }catch(e){
+      errEl.textContent = '読み込みエラー:' + e.message;
+      errEl.classList.add('show');
+    }
+  }
+  const bap = document.getElementById('bulk-approve');
+  if (bap) bap.onclick=()=>{ applyBulk(bulkState); render(); };
+  const bcan = document.getElementById('bulk-cancel');
+  if (bcan) bcan.onclick=()=>{ bulkState=null; render(); };
+  const bback = document.getElementById('bulk-back');
+  if (bback) bback.onclick=()=>{
+    const bid = bulkState.key;
+    bulkState = null;
+    go(bid ? {view:'biz', bizId:bid} : {view:'top'});
+  };
+}
+
+/* =========================================================
+   起動
+========================================================= */
+(async ()=>{ await loadState(); render(); })();
+</script>
+</body>
+</html>
